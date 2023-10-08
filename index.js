@@ -42,6 +42,19 @@ app.get("/api/persons", (request, response) => {
   response.json(persons);
 });
 
+app.get("/api/persons/:id", (request, response) => {
+  const id = Number(request.params.id);
+  const person = persons.filter((p) => id === p.id);
+
+  if (person.length === 0) {
+    return response.status(404).json({
+      error: "contact not in phonebook",
+    });
+  }
+
+  response.json(person);
+});
+
 const PORT = 3000;
 
 app.listen(PORT, () => {
