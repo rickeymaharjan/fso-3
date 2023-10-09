@@ -1,5 +1,6 @@
 const morgan = require("morgan");
 const express = require("express");
+const { response } = require("express");
 const app = express();
 app.use(express.json());
 app.use(morgan("dev"));
@@ -18,6 +19,8 @@ app.use(
     ].join(" ");
   })
 );
+
+app.use(express.static("dist"));
 
 let persons = [
   {
