@@ -1,7 +1,26 @@
+const mongoose = require("mongoose");
+const Person = require("./models/person");
 const morgan = require("morgan");
 const express = require("express");
 const { response } = require("express");
 const app = express();
+
+const errorHandler = (error, request, response, next) => {
+  console.log(error.message);
+
+  if (error.status === 404) {
+    // Handle 404 Not Found errors
+    response.status(404).send("Resource not found");
+  } else if (error.status === 401) {
+    // Handle 401 Unauthorized errors
+    response.status(401).send("Unauthorized");
+  } else {
+    response.status(500).send("Internal Server Error");
+  }
+
+  next(error);
+};
+
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -22,32 +41,7 @@ app.use(
 
 app.use(express.static("dist"));
 
-let persons = [
-  {
-    id: 1,
-    name: "Arto Hellas",
-    number: "040-123456",
-  },
-  {
-    id: 2,
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-  },
-  {
-    id: 3,
-    name: "Dan Abramov",
-    number: "12-43-234345",
-  },
-  {
-    id: 4,
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-  },
-];
-
-app.get("/", (request, response) => {
-  response.send("<h1>Phonebook</h1>");
-});
+let persons = [];
 
 app.get("/info", (request, response) => {
   const date = new Date();
@@ -59,27 +53,23 @@ app.get("/info", (request, response) => {
 });
 
 app.get("/api/persons", (request, response) => {
-  response.json(persons);
+  Person.find({}).then((people) => response.json(people));
 });
 
 app.get("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  const person = persons.filter((p) => id === p.id);
+  const id = request.params.id;
 
-  if (person.length === 0) {
-    return response.status(404).json({
-      error: "contact not in phonebook",
-    });
-  }
-
-  response.json(person);
+  Person.findById(id)
+    .then((person) => response.json(person))
+    .catch((error) => next(error));
 });
 
-app.delete("/api/persons/:id", (request, response) => {
-  const id = Number(request.params.id);
-  persons = persons.filter((p) => p.id !== id);
+app.delete("/api/persons/:id", (request, response, next) => {
+  const id = request.params.id;
 
-  response.status(204).end();
+  Person.findByIdAndDelete(id)
+    .then((results) => response.status(204).end())
+    .catch((error) => error(next));
 });
 
 app.post("/api/persons", (request, response) => {
@@ -99,18 +89,38 @@ app.post("/api/persons", (request, response) => {
     });
   }
 
-  const randomId = Math.round(Math.random() * 1000);
-
-  const newPerson = {
+  const newPerson = new Person({
     name: body.name,
     number: body.number,
-    id: randomId,
+  });
+
+  newPerson
+    .save()
+    .then((savedContact) => {
+      console.log("Contact saved in DB:", savedContact);
+      response.status(201).json(savedContact);
+    })
+    .catch((error) => {
+      console.error("Error saving the contact:", error);
+      response.status(500).json({ error: "Internal Server Error" });
+    });
+});
+
+app.put("/api/persons/:id", (request, response, next) => {
+  const id = request.params.id;
+  const body = request.body;
+
+  const person = {
+    name: body.name,
+    number: body.number,
   };
 
-  persons = persons.concat(newPerson);
-
-  response.status(201).json(newPerson);
+  Person.findByIdAndUpdate(id, person, { new: true })
+    .then((updatedPerson) => response.json(updatedPerson))
+    .catch((error) => next(error));
 });
+
+app.use(errorHandler);
 
 const PORT = 3000;
 
